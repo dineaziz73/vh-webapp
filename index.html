@@ -174,7 +174,17 @@ body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-syste
 .zb.sp{background:rgba(0,214,143,.15);color:var(--green)}
 .mc{width:calc(100% - 40px);margin:16px 20px 0;padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;color:var(--text2);font-size:14px;cursor:pointer}
 
+/* CHART */
+.chart-wrap{width:100%;height:220px;position:relative;overflow:hidden;background:var(--bg);border-radius:var(--rs);margin-bottom:16px}
+canvas.chart-cv{width:100%;height:100%;display:block}
+.chart-price-line{position:absolute;right:0;left:0;border-top:1px dashed rgba(255,255,255,0.3);pointer-events:none}
+.chart-price-lbl{position:absolute;right:4px;font-size:9px;font-family:monospace;color:rgba(255,255,255,0.6);transform:translateY(-50%)}
+.chart-legend{display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.chart-leg-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2)}
+.chart-leg-dot{width:8px;height:8px;border-radius:2px}
+
 /* TOAST */
+.toast{/* TOAST */
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 20px;font-size:13px;z-index:500;opacity:0;transition:all .3s;white-space:nowrap;pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,.5)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:var(--green);color:var(--green)}
@@ -263,6 +273,8 @@ body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-syste
       <div class="sgrid" id="g-1s"></div>
       <div class="grp-lbl">Boom & Crash</div>
       <div class="sgrid" id="g-bc"></div>
+      <div class="grp-lbl">Indices Supplémentaires</div>
+      <div class="sgrid" id="g-extra"></div>
     </div>
 
     <!-- SETTINGS -->
@@ -319,10 +331,38 @@ body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-syste
   </div>
 
   <nav class="bnav">
-    <button class="nit on" onclick="nav('home',this)"><span class="nico">⊞</span>Dashboard</button>
-    <button class="nit" onclick="nav('scanner',this)"><span class="nico">◎</span>Scanner</button>
-    <button class="nit" onclick="nav('settings',this)"><span class="nico">⚙</span>Réglages</button>
+    <button class="nit on" id="nav-home" onclick="nav('home',this)"><span class="nico">⊞</span>Dashboard</button>
+    <button class="nit" id="nav-scanner" onclick="nav('scanner',this)"><span class="nico">◎</span>Scanner</button>
+    <button class="nit" id="nav-settings" onclick="nav('settings',this)"><span class="nico">⚙</span>Réglages</button>
   </nav>
+
+  <!-- PAGE GRAPHIQUE PLEIN ECRAN -->
+  <div id="chart-page" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:200;flex-direction:column;">
+    <div style="display:flex;align-items:center;gap:12px;padding:max(16px,env(safe-area-inset-top)) 16px 12px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;">
+      <button onclick="closeChartPage()" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:18px;width:36px;height:36px;cursor:pointer;">←</button>
+      <div style="flex:1">
+        <div id="cp-sym" style="font-size:16px;font-weight:800"></div>
+        <div id="cp-meta" style="font-size:11px;color:var(--text2)"></div>
+      </div>
+      <div id="cp-price" style="font-size:16px;font-weight:700;font-family:monospace;color:var(--green)"></div>
+    </div>
+    <div style="flex:1;position:relative;overflow:hidden;">
+      <canvas id="main-chart" style="width:100%;height:100%;display:block;"></canvas>
+      <div id="chart-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--text2);">
+        <div style="width:32px;height:32px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite"></div>
+        <div style="font-size:12px;font-family:monospace">Chargement des bougies...</div>
+      </div>
+    </div>
+    <div style="background:var(--bg2);border-top:1px solid var(--border);padding:10px 16px;flex-shrink:0;">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2)"><div style="width:10px;height:10px;border-radius:2px;background:#e63946"></div>Résistance maj.</div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2)"><div style="width:10px;height:10px;border-radius:2px;background:#4361ee"></div>Support maj.</div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2)"><div style="width:10px;height:10px;border-radius:2px;background:rgba(230,57,70,0.3)"></div>Rés. mineure</div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2)"><div style="width:10px;height:10px;border-radius:2px;background:rgba(67,97,238,0.3)"></div>Sup. mineur</div>
+      </div>
+      <div id="cp-zones" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;"></div>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL -->
@@ -334,6 +374,16 @@ body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-syste
       <div class="mm" id="m-meta">—</div>
     </div>
     <div class="mb">
+      <div class="sec-t" style="margin-bottom:10px">Graphique H1</div>
+      <div class="chart-wrap">
+        <canvas class="chart-cv" id="chart-cv"></canvas>
+      </div>
+      <div class="chart-legend">
+        <div class="chart-leg-item"><div class="chart-leg-dot" style="background:#e63946"></div>Résistance maj.</div>
+        <div class="chart-leg-item"><div class="chart-leg-dot" style="background:#4361ee"></div>Support maj.</div>
+        <div class="chart-leg-item"><div class="chart-leg-dot" style="background:rgba(230,57,70,0.3)"></div>Résistance min.</div>
+        <div class="chart-leg-item"><div class="chart-leg-dot" style="background:rgba(67,97,238,0.3)"></div>Support min.</div>
+      </div>
       <div class="sec-t" style="margin-bottom:12px">Zones détectées</div>
       <div class="zl" id="m-zones"></div>
     </div>
@@ -376,9 +426,15 @@ const SYMS = {
     {id:'CRASH300N',n:'Crash300',  f:'Crash 300 Index'},
     {id:'CRASH500', n:'Crash500',  f:'Crash 500 Index'},
     {id:'CRASH1000',n:'Crash1000', f:'Crash 1000 Index'},
+  ],
+  extra: [
+    {id:'R_15',     n:'V15',       f:'Volatility 15 Index'},
+    {id:'1HZ15V',   n:'V15(1s)',   f:'Volatility 15 (1s) Index'},
+    {id:'1HZ90V',   n:'V90(1s)',   f:'Volatility 90 (1s) Index'},
+    {id:'1HZ150V',  n:'V150(1s)',  f:'Volatility 150 (1s) Index'},
   ]
 };
-const ALL = [...SYMS.std, ...SYMS.one, ...SYMS.bc];
+const ALL = [...SYMS.std, ...SYMS.one, ...SYMS.bc, ...SYMS.extra];
 
 // ================================================================
 // STATE
@@ -417,6 +473,7 @@ function launchApp() {
   document.getElementById('app').classList.add('show');
   applySettings(); updateTgUI(); buildGrids(); updateGreeting(); renderFeed();
   document.getElementById('s-tot').textContent = ALL.length;
+  document.getElementById('greet-sub').textContent = 'Scan actif · ' + ALL.length + ' indices';
   connectDeriv();
   tgSend('VH SmartAlert Pro - ACTIF !\nScan de '+ALL.length+' indices en cours...');
 }
@@ -451,6 +508,7 @@ function connectDeriv() {
 }
 
 function fetchC(id){ ws.send(JSON.stringify({ticks_history:id,count:200,end:'latest',granularity:3600,style:'candles',adjust_start_time:1})); }
+function fetchCandles(id){ fetchC(id); }
 function subTick(id){ ws.send(JSON.stringify({ticks:id,subscribe:1})); }
 function setLive(on){
   const d=document.getElementById('ldot'), t=document.getElementById('ltxt');
@@ -471,6 +529,11 @@ function onCandles(data) {
   symD[id].trend=calcTrend(c);
   ready++;
   updateCard(id); updateStats(); setLive(true);
+  // Si la page graphique est ouverte sur cet indice, redessiner
+  const cpEl=document.getElementById('chart-page');
+  if(cpEl&&cpEl.style.display==='flex'&&cpEl.dataset.symId===id){
+    drawMainChart(id);
+  }
 }
 
 function calcTrend(c){
@@ -545,6 +608,11 @@ function onTick(t){
     nz.forEach(z=>checkAl(s,z,t.quote));
   }
   updateCard(t.symbol);
+  // Mettre à jour chart si page ouverte sur cet indice
+  const cp=document.getElementById('chart-page');
+  if(cp&&cp.style.display==='flex'&&cp.dataset.symId===t.symbol){
+    document.getElementById('cp-price').textContent='$'+s.price.toFixed(s.price>1000?2:s.price>10?3:4);
+  }
 }
 
 // ================================================================
@@ -687,7 +755,7 @@ function browserNotif(title,body){
 // UI
 // ================================================================
 function buildGrids(){
-  const grps=[{k:'std',gid:'g-std'},{k:'one',gid:'g-1s'},{k:'bc',gid:'g-bc'}];
+  const grps=[{k:'std',gid:'g-std'},{k:'one',gid:'g-1s'},{k:'bc',gid:'g-bc'},{k:'extra',gid:'g-extra'}];
   grps.forEach(({k,gid})=>{
     const g=document.getElementById(gid); if(!g) return;
     g.innerHTML=SYMS[k].map(s=>`
@@ -745,11 +813,316 @@ function renderFeed(){
     </div>`).join('');
 }
 
-function showModal(id){
+
+// ================================================================
+// GRAPHIQUE DE BOUGIES
+// ================================================================
+function drawChartWithRetry(symId, attempt) {
+  const s = symD[symId];
+  const candles = s.candles || [];
+  if (candles.length < 5 && attempt < 10) {
+    // Données pas encore là → refetcher et réessayer
+    if (attempt === 0) fetchCandles(symId);
+    setTimeout(() => drawChartWithRetry(symId, attempt + 1), 500);
+    // Afficher un message d'attente
+    const canvas = document.getElementById('chart-cv');
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      const W = canvas.parentElement.clientWidth;
+      const H = canvas.parentElement.clientHeight;
+      canvas.width  = W * window.devicePixelRatio;
+      canvas.height = H * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      ctx.fillStyle = '#080810';
+      ctx.fillRect(0,0,W,H);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Chargement des données...', W/2, H/2);
+      ctx.textAlign = 'left';
+    }
+    return;
+  }
+  drawChart(symId);
+}
+
+function drawChart(symId) {
+  const canvas = document.getElementById('chart-cv');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const s = symD[symId];
+  const candles = s.candles || [];
+  if (!candles.length) { ctx.clearRect(0,0,canvas.width,canvas.height); return; }
+
+  // Resize canvas
+  const wrap = canvas.parentElement;
+  canvas.width  = wrap.clientWidth  * window.devicePixelRatio;
+  canvas.height = wrap.clientHeight * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+
+  // Prendre les 60 dernières bougies
+  const disp = candles.slice(-60);
+  const allHi = disp.map(c=>c.high), allLo = disp.map(c=>c.low);
+  let minP = Math.min(...allLo), maxP = Math.max(...allHi);
+
+  // Ajouter les zones dans le range
+  s.zones.forEach(z=>{ minP=Math.min(minP,z.lower); maxP=Math.max(maxP,z.upper); });
+  const pad = (maxP-minP)*0.05;
+  minP-=pad; maxP+=pad;
+
+  const priceToY = p => H - ((p - minP) / (maxP - minP)) * H;
+  const candleW  = Math.max(2, (W / disp.length) * 0.7);
+  const step     = W / disp.length;
+
+  // Fond
+  ctx.fillStyle = '#080810';
+  ctx.fillRect(0,0,W,H);
+
+  // Grille horizontale
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i=0; i<=4; i++) {
+    const y = H * i / 4;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+
+  // Zones de réaction
+  s.zones.forEach(z => {
+    const y1 = priceToY(z.upper), y2 = priceToY(z.lower);
+    if (z.isR) {
+      ctx.fillStyle = z.maj ? 'rgba(230,57,70,0.25)' : 'rgba(230,57,70,0.10)';
+    } else {
+      ctx.fillStyle = z.maj ? 'rgba(67,97,238,0.25)' : 'rgba(67,97,238,0.10)';
+    }
+    ctx.fillRect(0, y1, W, y2 - y1);
+
+    // Ligne centrale de la zone
+    const yMid = priceToY(z.price);
+    ctx.strokeStyle = z.isR
+      ? (z.maj ? 'rgba(230,57,70,0.8)' : 'rgba(230,57,70,0.4)')
+      : (z.maj ? 'rgba(67,97,238,0.8)'  : 'rgba(67,97,238,0.4)');
+    ctx.lineWidth = z.maj ? 1.5 : 1;
+    ctx.setLineDash(z.maj ? [] : [4,3]);
+    ctx.beginPath(); ctx.moveTo(0,yMid); ctx.lineTo(W,yMid); ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // Bougies
+  disp.forEach((c, i) => {
+    const x   = i * step + step / 2;
+    const yO  = priceToY(c.open), yC = priceToY(c.close);
+    const yH  = priceToY(c.high), yL = priceToY(c.low);
+    const bull = c.close >= c.open;
+    const clr  = bull ? '#00d68f' : '#e63946';
+
+    // Mèche
+    ctx.strokeStyle = clr;
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, yH); ctx.lineTo(x, yL);
+    ctx.stroke();
+
+    // Corps
+    const bodyTop = Math.min(yO, yC);
+    const bodyH   = Math.max(1, Math.abs(yC - yO));
+    ctx.fillStyle  = bull ? 'rgba(0,214,143,0.85)' : 'rgba(230,57,70,0.85)';
+    ctx.fillRect(x - candleW/2, bodyTop, candleW, bodyH);
+  });
+
+  // Prix actuel
+  if (s.price) {
+    const yNow = priceToY(s.price);
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(0,yNow); ctx.lineTo(W,yNow); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Label prix
+    const dp = s.price>1000?2:s.price>10?3:4;
+    ctx.fillStyle = 'rgba(20,20,40,0.8)';
+    ctx.fillRect(W-70, yNow-9, 68, 18);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font      = '9px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('$'+s.price.toFixed(dp), W-4, yNow+3);
+    ctx.textAlign = 'left';
+  }
+}
+
+function showModal(id){ showChartPage(id); }
+
+
+// ================================================================
+// GRAPHIQUE PRINCIPAL PLEIN ECRAN
+// ================================================================
+function drawMainChart(symId) {
+  const canvas = document.getElementById('main-chart');
+  if (!canvas) return;
+  const s = symD[symId];
+  const loading = document.getElementById('chart-loading');
+
+  const candles = s.candles || [];
+  if (candles.length < 3) {
+    if(loading) loading.style.display='flex';
+    return;
+  }
+  if(loading) loading.style.display='none';
+
+  // Setup canvas
+  const W = canvas.offsetWidth  || window.innerWidth;
+  const H = canvas.offsetHeight || (window.innerHeight - 200);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  // Données
+  const disp = candles.slice(-80);
+  let minP = Math.min(...disp.map(c=>c.low));
+  let maxP = Math.max(...disp.map(c=>c.high));
+
+  // Inclure zones dans le range
+  s.zones.forEach(z=>{ minP=Math.min(minP,z.lower); maxP=Math.max(maxP,z.upper); });
+  if(s.price){ minP=Math.min(minP,s.price); maxP=Math.max(maxP,s.price); }
+
+  const padPct = (maxP-minP)*0.06;
+  minP -= padPct; maxP += padPct;
+
+  const pY = p => H - ((p-minP)/(maxP-minP))*H;
+  const step = W / disp.length;
+  const cw   = Math.max(1.5, step * 0.65);
+
+  // Fond
+  ctx.fillStyle='#080810';
+  ctx.fillRect(0,0,W,H);
+
+  // Grille + labels prix
+  ctx.strokeStyle='rgba(255,255,255,0.04)';
+  ctx.fillStyle='rgba(255,255,255,0.25)';
+  ctx.font=`${Math.max(8,W/60)}px monospace`;
+  const dp2=minP>1000?0:minP>10?2:4;
+  for(let i=0;i<=5;i++){
+    const p = minP + (maxP-minP)*i/5;
+    const y = pY(p);
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    ctx.fillText('$'+p.toFixed(dp2), 4, y-3);
+  }
+
+  // Zones de réaction
+  s.zones.forEach(z=>{
+    const y1=pY(z.upper), y2=pY(z.lower);
+    ctx.fillStyle=z.isR
+      ?(z.maj?'rgba(230,57,70,0.2)':'rgba(230,57,70,0.08)')
+      :(z.maj?'rgba(67,97,238,0.2)' :'rgba(67,97,238,0.08)');
+    ctx.fillRect(0,y1,W,Math.max(1,y2-y1));
+
+    // Ligne de zone
+    const yM=pY(z.price);
+    ctx.strokeStyle=z.isR
+      ?(z.maj?'rgba(230,57,70,0.9)':'rgba(230,57,70,0.4)')
+      :(z.maj?'rgba(67,97,238,0.9)' :'rgba(67,97,238,0.4)');
+    ctx.lineWidth=z.maj?1.5:1;
+    ctx.setLineDash(z.maj?[]:[4,3]);
+    ctx.beginPath(); ctx.moveTo(0,yM); ctx.lineTo(W,yM); ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // Bougies
+  disp.forEach((c,i)=>{
+    const x  = i*step + step/2;
+    const yO = pY(c.open), yC=pY(c.close);
+    const yH = pY(c.high), yL=pY(c.low);
+    const bull = c.close>=c.open;
+    const clr  = bull?'#00d68f':'#e63946';
+
+    ctx.strokeStyle=clr; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x,yH); ctx.lineTo(x,yL); ctx.stroke();
+
+    const bTop=Math.min(yO,yC), bH=Math.max(1.5,Math.abs(yC-yO));
+    ctx.fillStyle=bull?'rgba(0,214,143,0.85)':'rgba(230,57,70,0.85)';
+    ctx.fillRect(x-cw/2, bTop, cw, bH);
+  });
+
+  // Prix actuel
+  if(s.price){
+    const yNow=pY(s.price);
+    ctx.strokeStyle='rgba(255,213,0,0.8)';
+    ctx.lineWidth=1.5;
+    ctx.setLineDash([6,3]);
+    ctx.beginPath(); ctx.moveTo(0,yNow); ctx.lineTo(W,yNow); ctx.stroke();
+    ctx.setLineDash([]);
+
+    const dp3=s.price>1000?2:s.price>10?3:4;
+    const lbl='$'+s.price.toFixed(dp3);
+    const lblW=ctx.measureText(lbl).width+10;
+    ctx.fillStyle='rgba(255,213,0,0.9)';
+    ctx.fillRect(W-lblW-4, yNow-9, lblW+4, 18);
+    ctx.fillStyle='#000';
+    ctx.font='bold 10px monospace';
+    ctx.textAlign='right';
+    ctx.fillText(lbl, W-6, yNow+3);
+    ctx.textAlign='left';
+  }
+
+  // Mettre à jour le prix dans le header
+  if(s.price){
+    const dp4=s.price>1000?2:s.price>10?3:4;
+    document.getElementById('cp-price').textContent='$'+s.price.toFixed(dp4);
+  }
+}
+
+function showChartPage(id){
+  const s=symD[id];
+  const dp=s.price>1000?2:s.price>10?3:4;
+  const tr=s.trend==='bull'?'↑ Haussier H1':s.trend==='bear'?'↓ Baissier H1':'Analyse...';
+  const tclr=s.trend==='bull'?'var(--green)':'var(--accent)';
+
+  document.getElementById('cp-sym').textContent=s.f;
+  document.getElementById('cp-meta').style.color=tclr;
+  document.getElementById('cp-meta').textContent=tr;
+  document.getElementById('cp-price').textContent=s.price?'$'+s.price.toFixed(dp):'—';
+
+  // Zones en pills
+  const zpEl=document.getElementById('cp-zones');
+  zpEl.innerHTML=s.zones.sort((a,b)=>b.price-a.price).map(z=>{
+    const clr=z.isR?(z.maj?'#e63946':'rgba(230,57,70,0.6)'):(z.maj?'#4361ee':'rgba(67,97,238,0.6)');
+    const dir=z.isR?'R':'S';
+    return `<div style="flex-shrink:0;background:var(--bg3);border:1px solid ${clr};border-radius:20px;padding:4px 10px;font-size:10px;font-family:monospace;color:${clr}">${dir} $${z.price.toFixed(dp)}</div>`;
+  }).join('');
+
+  // Afficher la page
+  const pg=document.getElementById('chart-page');
+  pg.style.display='flex';
+
+  // Stocker l'id courant
+  pg.dataset.symId=id;
+
+  // Lancer le dessin
+  drawMainChart(id);
+
+  // Fetcher si pas de candles
+  if(!s.candles||s.candles.length<5){
+    fetchC(id);
+    setTimeout(()=>drawMainChart(id),1500);
+    setTimeout(()=>drawMainChart(id),3000);
+  }
+}
+
+function closeChartPage(){
+  document.getElementById('chart-page').style.display='none';
+}
+
+function showModal(id_unused){} // legacy
+
+function showModal_old(id){
   const s=symD[id]; document.getElementById('m-sym').textContent=s.f;
   const dp=s.price>1000?2:s.price>10?3:4;
   const tr=s.trend==='bull'?'↑ Haussier':s.trend==='bear'?'↓ Baissier':'—';
   document.getElementById('m-meta').textContent=tr+' · '+(s.price?'$'+s.price.toFixed(dp):'—');
+  drawChartWithRetry(id, 0);
   const zl=document.getElementById('m-zones');
   if(!s.zones.length){ zl.innerHTML='<div style="color:var(--text2);text-align:center;padding:20px;font-size:13px">Aucune zone détectée</div>'; }
   else{
