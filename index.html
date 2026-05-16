@@ -345,7 +345,7 @@ body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-syste
 
 <script>
 // ================================================================
-// CONFIG — REMPLACE TON_TOKEN_BOT_ICI PAR TON TOKEN TELEGRAM
+// CONFIG — REMPLACE 8886477360:AAGzRpOmq_3iAoKA1G8vtj-oInwvC5BoiPI PAR TON TOKEN TELEGRAM
 // ================================================================
 const DERIV_TOKEN  = 'DyctVHAb713ZGGC';
 const TG_TOKEN     = '8886477360:AAGzRpOmq_3iAoKA1G8vtj-oInwvC5BoiPI';
@@ -433,8 +433,16 @@ function connectDeriv() {
         const d=JSON.parse(e.data);
         if(d.error){console.warn('Deriv:',d.error.message);return;}
         if(d.msg_type==='authorize'){ setLive(true); ALL.forEach(s=>{fetchC(s.id);subTick(s.id);}); }
-        if(d.msg_type==='candles') onCandles(d);
-        if(d.msg_type==='tick')    onTick(d.tick);
+        if(d.msg_type==='candles') {
+          // Distinguer H1 et M5
+          if(d.echo_req && d.echo_req.granularity===300) {
+            const sid = d.echo_req.ticks_history;
+            if(sid) m5Candles[sid] = d.candles || [];
+          } else {
+            onCandles(d);
+          }
+        }
+        if(d.msg_type==='tick') onTick(d.tick);
       } catch(ex){console.warn(ex);}
     };
     ws.onerror = ()=>setLive(false);
@@ -532,21 +540,80 @@ function onTick(t){
   const prox=t.quote*0.002;
   const nz=s.zones.filter(z=>t.quote>=z.lower-prox&&t.quote<=z.upper+prox);
   s.near=nz.length>0;
-  if(s.near) nz.forEach(z=>checkAl(s,z,t.quote));
+  if(s.near){
+    if(!m5Candles[t.symbol]) fetchM5Candles(t.symbol);
+    nz.forEach(z=>checkAl(s,z,t.quote));
+  }
   updateCard(t.symbol);
 }
 
+// ================================================================
+// BOUGIES M5 REELLES
+// ================================================================
+let m5Candles={};
+
+function fetchM5Candles(symId){
+  if(!ws||ws.readyState!==WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ticks_history:symId,count:30,end:'latest',granularity:300,style:'candles',adjust_start_time:1}));
+}
+
+function detectM5Conf(s,z,price){
+  const c=m5Candles[s.id];
+  if(!c||c.length<3){
+    // Fallback position dans la zone
+    const zh=z.upper-z.lower; const pos=(price-z.lower)/zh;
+    if(!z.isR&&pos<0.3) return 'REBOND SUPPORT';
+    if(z.isR&&pos>0.7)  return 'REJET RESISTANCE';
+    return '';
+  }
+  const n=c.length-1;
+  const o=c[n].open,h=c[n].high,l=c[n].low,cl=c[n].close;
+  const body=Math.abs(cl-o), total=h-l;
+
+  // DOJI
+  if(total>0&&body/total<=0.15) return 'DOJI';
+  // MARTEAU (support)
+  if(!z.isR&&cl>o&&body>0){const lw=Math.min(o,cl)-l,uw=h-Math.max(o,cl);if(lw>=body*1.5&&uw<=body*0.6) return 'MARTEAU';}
+  // PENDU (resistance)
+  if(z.isR&&cl<o&&body>0){const lw=Math.min(o,cl)-l,uw=h-Math.max(o,cl);if(lw>=body*1.5&&uw<=body*0.6) return 'PENDU';}
+  // ENGLOBANTE haussiere
+  if(!z.isR&&n>=1&&cl>o&&c[n-1].close<c[n-1].open&&body>Math.abs(c[n-1].close-c[n-1].open)*1.2) return 'ENGLOBANTE';
+  // ENGLOBANTE baissiere
+  if(z.isR&&n>=1&&cl<o&&c[n-1].close>c[n-1].open&&body>Math.abs(c[n-1].close-c[n-1].open)*1.2) return 'ENGLOBANTE';
+  // FIGURE W
+  if(!z.isR&&c.length>=10){
+    const lo=c.map(x=>x.low),hi2=c.map(x=>x.high);
+    for(let i=3;i<Math.min(15,c.length)-3;i++){
+      if(!(lo[i]<lo[i-1]&&lo[i]<lo[i+1]&&lo[i]<lo[i-2]&&lo[i]<lo[i+2])) continue;
+      let pk=0,pkI=-1; for(let j=i-1;j>=2&&j>=i-10;j--) if(hi2[j]>pk){pk=hi2[j];pkI=j;}
+      if(pkI<0) continue;
+      for(let k=pkI-1;k>=1&&k>=pkI-8;k--){if(!(lo[k]<lo[k-1]&&lo[k]<lo[k+1])) continue;if(Math.abs(lo[k]-lo[i])<=(pk-lo[i])*0.35) return 'FIGURE W';break;}
+    }
+  }
+  // FIGURE M
+  if(z.isR&&c.length>=10){
+    const lo2=c.map(x=>x.low),hi3=c.map(x=>x.high);
+    for(let i=3;i<Math.min(15,c.length)-3;i++){
+      if(!(hi3[i]>hi3[i-1]&&hi3[i]>hi3[i+1]&&hi3[i]>hi3[i-2]&&hi3[i]>hi3[i+2])) continue;
+      let vl=999999,vlI=-1; for(let j=i-1;j>=2&&j>=i-10;j--) if(lo2[j]<vl){vl=lo2[j];vlI=j;}
+      if(vlI<0) continue;
+      for(let k=vlI-1;k>=1&&k>=vlI-8;k--){if(!(hi3[k]>hi3[k-1]&&hi3[k]>hi3[k+1])) continue;if(Math.abs(hi3[k]-hi3[i])<=(hi3[i]-vl)*0.35) return 'FIGURE M';break;}
+    }
+  }
+  return '';
+}
+
+// ================================================================
+// VERIF ZONE + ALERTE
+// ================================================================
 function checkAl(s,z,px){
   const now=Date.now(), zk=z.price.toFixed(2);
   if(now-(s.lastAl[zk]||0)<cfg.cd*3600000) return;
   if(cfg.trend){ if(z.isR&&s.trend==='bull') return; if(!z.isR&&s.trend==='bear') return; }
   let conf='';
   if(cfg.m5){
-    const inZ=(px-z.lower)/(z.upper-z.lower);
-    if(!z.isR&&inZ<0.3) conf='REBOND SUPPORT';
-    else if(z.isR&&inZ>0.7) conf='REJET RESISTANCE';
-    else if(inZ>0.4&&inZ<0.6) conf='DOJI';
-    else return;
+    conf=detectM5Conf(s,z,px);
+    if(!conf) return;
   }
   s.lastAl[zk]=now;
   fireAl(s,z,px,conf);
@@ -564,9 +631,29 @@ function fireAl(s,z,px,conf){
   const tr=s.trend==='bull'?'HAUSSIERE':'BAISSIERE';
   const cf=conf?' | Conf: '+conf:'';
 
-  const msg=s.f+'\nZONE '+zt+' '+zd+cf+'\nPrix: '+px.toFixed(dp)+' | Zone: '+z.price.toFixed(dp)+'\nSL suggere: '+sl+'\nTendance H1: '+tr+'\nHeure: '+t;
+  // Emojis selon direction
+  const emojiDir  = z.isR ? '🔴' : '🟢';
+  const emojiZone = z.maj ? '⭐' : '◆';
+  const emojiTrend= s.trend==='bull' ? '📈' : '📉';
+  const emojiConf = conf ? '✅' : '';
+  const emojiSL   = '🛡';
+  const emojiTime = '🕐';
+
+  const msg=
+    emojiDir+' '+s.f+'\n'+
+    emojiZone+' ZONE '+zt+' '+zd+cf+'\n'+
+    '━━━━━━━━━━━━━━\n'+
+    '💰 Prix: '+px.toFixed(dp)+'\n'+
+    '🎯 Zone: '+z.price.toFixed(dp)+'\n'+
+    emojiSL+' SL suggere: '+sl+'\n'+
+    '━━━━━━━━━━━━━━\n'+
+    emojiTrend+' Tendance H1: '+tr+'\n'+
+    emojiTime+' Heure: '+t;
   tgSend(msg);
-  if(cfg.browser) browserNotif(s.n+' — '+zt+' '+zd,'Confirmation: '+(conf||'Zone atteinte'));
+  if(cfg.browser) browserNotif(
+    (z.isR?'🔴':'🟢')+' '+s.n+' — '+zt+' '+zd,
+    (conf?'✅ Conf: '+conf:'📍 Zone atteinte')+' | SL: '+sl
+  );
 
   const obj={id:Date.now(),sym:s.n,full:s.f,zt,zd,conf,px:px.toFixed(dp),zone:z.price.toFixed(dp),sl,tr,t,isR:z.isR,maj:z.maj};
   alerts.unshift(obj); if(alerts.length>50) alerts.pop();
