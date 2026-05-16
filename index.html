@@ -7,7 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="VH SmartAlert">
 <meta name="theme-color" content="#080810">
-<title>VH SmartAlert</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<title>VH SmartAlert v2.1</title>
 <style>
 :root {
   --bg:#080810; --bg2:#0f0f1a; --bg3:#161625; --card:#111122; --border:#1e1e35;
@@ -453,12 +455,13 @@ function load() {
 // BOOT
 // ================================================================
 window.addEventListener('load', () => {
+  console.log('VH SmartAlert v2.1 démarré');
   load();
   setTimeout(() => {
     document.getElementById('splash').style.display='none';
     if(chatId) launchApp();
     else document.getElementById('setup').classList.add('show');
-  }, 2000);
+  }, 1500);
 });
 
 function doSetup() {
@@ -470,6 +473,7 @@ function doSetup() {
 }
 
 function launchApp() {
+  console.log('launchApp called, chatId:', chatId);
   document.getElementById('app').classList.add('show');
   applySettings(); updateTgUI(); buildGrids(); updateGreeting(); renderFeed();
   document.getElementById('s-tot').textContent = ALL.length;
@@ -969,6 +973,9 @@ function drawMainChart(symId) {
     return;
   }
   if(loading) loading.style.display='none';
+  // Scroll vers le haut du canvas
+  const pg = document.getElementById('chart-page');
+  if(pg) pg.scrollTop = 0;
 
   // Setup canvas
   const W = canvas.offsetWidth  || window.innerWidth;
@@ -1074,6 +1081,51 @@ function drawMainChart(symId) {
   }
 }
 
+
+// ================================================================
+// FETCH CANDLES VIA HTTP (plus fiable que WebSocket pour chart)
+// ================================================================
+async function fetchCandlesHTTP(symId) {
+  try {
+    const end = Math.floor(Date.now() / 1000);
+    const start = end - (200 * 3600); // 200 heures
+    const url = `https://api.deriv.com/api/v1/ticks_history?ticks_history=${symId}&adjust_start_time=1&count=100&end=latest&granularity=3600&style=candles`;
+    
+    // Utiliser l'API WebSocket mais via une nouvelle connexion dédiée
+    return new Promise((resolve) => {
+      const ws2 = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
+      const timeout = setTimeout(() => { ws2.close(); resolve([]); }, 8000);
+      
+      ws2.onopen = () => {
+        ws2.send(JSON.stringify({
+          ticks_history: symId,
+          count: 100,
+          end: 'latest',
+          granularity: 3600,
+          style: 'candles',
+          adjust_start_time: 1
+        }));
+      };
+      
+      ws2.onmessage = (e) => {
+        try {
+          const d = JSON.parse(e.data);
+          if(d.msg_type === 'candles' && d.candles) {
+            clearTimeout(timeout);
+            ws2.close();
+            resolve(d.candles);
+          }
+        } catch(ex) { resolve([]); }
+      };
+      
+      ws2.onerror = () => { clearTimeout(timeout); resolve([]); };
+    });
+  } catch(e) {
+    console.warn('fetchCandlesHTTP error:', e);
+    return [];
+  }
+}
+
 function showChartPage(id){
   const s=symD[id];
   const dp=s.price>1000?2:s.price>10?3:4;
@@ -1103,11 +1155,17 @@ function showChartPage(id){
   // Lancer le dessin
   drawMainChart(id);
 
-  // Fetcher si pas de candles
+  // Fetcher via HTTP direct si pas de candles ou peu de candles
   if(!s.candles||s.candles.length<5){
-    fetchC(id);
-    setTimeout(()=>drawMainChart(id),1500);
-    setTimeout(()=>drawMainChart(id),3000);
+    fetchCandlesHTTP(id).then(candles => {
+      if(candles && candles.length > 0){
+        symD[id].candles = candles;
+        drawMainChart(id);
+      }
+    });
+  } else {
+    // Candles déjà là, dessiner immédiatement
+    setTimeout(()=>drawMainChart(id), 100);
   }
 }
 
@@ -1115,17 +1173,7 @@ function closeChartPage(){
   document.getElementById('chart-page').style.display='none';
 }
 
-// legacy modal removed
-  if(!s.zones.length){ zl.innerHTML='<div style="color:var(--text2);text-align:center;padding:20px;font-size:13px">Aucune zone détectée</div>'; }
-  else{
-    zl.innerHTML=s.zones.sort((a,b)=>b.price-a.price).map(z=>{
-      const cls=z.maj?(z.isR?'mr':'ms2'):(z.isR?'nr':'ns');
-      const bdg=z.maj?'mj':'mn', bt=z.maj?'MAJEURE':'mineure', dir=z.isR?'Résistance':'Support';
-      return `<div class="zr ${cls}"><div><div class="zl2">${dir}</div><div class="zp">$${z.price.toFixed(dp)}</div></div><div style="text-align:right"><div class="zb ${bdg}">${bt}</div><div style="font-size:10px;color:var(--text2);margin-top:4px">${z.tc}x touches</div></div></div>`;
-    }).join('');
-  }
-  document.getElementById('modal').classList.add('open');
-}
+
 function clModal(e){ if(!e||e.target===document.getElementById('modal')) document.getElementById('modal').classList.remove('open'); }
 
 function nav(pg,btn){
