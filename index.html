@@ -735,7 +735,7 @@ function fireAl(s,z,px,conf){
 // TELEGRAM
 // ================================================================
 async function tgSend(txt){
-  if(!chatId||TG_TOKEN==='8886477360:AAGzRpOmq_3iAoKA1G8vtj-oInwvC5BoiPI') return;
+  if(!chatId||!TG_TOKEN||TG_TOKEN==='TON_TOKEN_BOT_ICI') return; // token OK
   try{
     await fetch('https://api.telegram.org/bot'+TG_TOKEN+'/sendMessage',{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -759,7 +759,7 @@ function buildGrids(){
   grps.forEach(({k,gid})=>{
     const g=document.getElementById(gid); if(!g) return;
     g.innerHTML=SYMS[k].map(s=>`
-      <div class="sc" id="c-${s.id}" onclick="showModal('${s.id}')">
+      <div class="sc" id="c-${s.id}" onclick="showChartPage('${s.id}')">
         <div class="sc-name">${s.n}</div>
         <div class="sc-trend ld" id="tr-${s.id}">Analyse...</div>
         <div class="sc-px" id="px-${s.id}">—</div>
@@ -1115,15 +1115,7 @@ function closeChartPage(){
   document.getElementById('chart-page').style.display='none';
 }
 
-function showModal(id_unused){} // legacy
-
-function showModal_old(id){
-  const s=symD[id]; document.getElementById('m-sym').textContent=s.f;
-  const dp=s.price>1000?2:s.price>10?3:4;
-  const tr=s.trend==='bull'?'↑ Haussier':s.trend==='bear'?'↓ Baissier':'—';
-  document.getElementById('m-meta').textContent=tr+' · '+(s.price?'$'+s.price.toFixed(dp):'—');
-  drawChartWithRetry(id, 0);
-  const zl=document.getElementById('m-zones');
+// legacy modal removed
   if(!s.zones.length){ zl.innerHTML='<div style="color:var(--text2);text-align:center;padding:20px;font-size:13px">Aucune zone détectée</div>'; }
   else{
     zl.innerHTML=s.zones.sort((a,b)=>b.price-a.price).map(z=>{
